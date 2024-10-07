@@ -5,37 +5,51 @@ command -v bc > /dev/null || { echo "error: bc was not found. Please install bc.
 { command -v drill > /dev/null && dig=drill; } || { command -v dig > /dev/null && dig=dig; } || { echo "error: dig was not found. Please install dnsutils."; exit 1; }
 
 
-NAMESERVERS=`cat /etc/resolv.conf | grep ^nameserver | cut -d " " -f 2 | sed 's/\(.*\)/&#&/'`
+NAMESERVERS=`cat /etc/resolv.conf | grep ^nameserver | cut -f 2 | cut -d " " -f 2 | sed 's/$/#[\/etc\/resolv.conf]/'`
 
 PROVIDERSV4="
-1.1.1.1#cloudflare 
+1.0.0.1#cloudflare1
+1.1.1.1#cloudflare2
+1.0.0.2#cloudflare-filtered1
+1.1.1.2#cloudflare-filtered2
 4.2.2.1#level3 
-8.8.8.8#google 
-9.9.9.9#quad9 
+8.8.8.8#google1
+8.8.4.4#google2
+9.9.9.9#quad9-1
+149.112.112.112#quad9-2
 80.80.80.80#freenom 
 208.67.222.123#opendns 
 199.85.126.20#norton 
 185.228.168.168#cleanbrowsing 
 77.88.8.7#yandex 
-176.103.130.132#adguard 
+94.140.14.14#adguard
+94.140.14.140#adguard-nofilter
+94.140.14.15#adguard-family
 156.154.70.3#neustar 
 8.26.56.26#comodo
 45.90.28.202#nextdns
 "
 
 PROVIDERSV6="
-2606:4700:4700::1111#cloudflare-v6
-2001:4860:4860::8888#google-v6
-2620:fe::fe#quad9-v6
+2606:4700:4700::1001#cloudflare1-v6
+2606:4700:4700::1111#cloudflare2-v6
+2606:4700:4700::1002#cloudflare-filtered1-v6
+2606:4700:4700::1112#cloudflare-filtered2-v6
+2001:4860:4860::8888#google1-v6
+2001:4860:4860::8844#google2-v6
+2620:fe::fe#quad9-1-v6
+2620:fe::fe:9#quad9-2-v6
 2620:119:35::35#opendns-v6
 2a0d:2a00:1::1#cleanbrowsing-v6
 2a02:6b8::feed:0ff#yandex-v6
-2a00:5a60::ad1:0ff#adguard-v6
+2a10:50c0::ad1:ff#adguard-v6
+2a10:50c0::1:ff#adguard-v6-nofilter
+2a10:50c0::bad1:ff#adguard-v6-family
 2610:a1:1018::3#neustar-v6
 "
 
 # Testing for IPv6
-$dig +short +tries=1 +time=2 +stats @2a0d:2a00:1::1 www.google.com |grep 216.239.38.120 >/dev/null 2>&1
+$dig +short +tries=1 +time=2 +stats @2a0d:2a00:1::1 www.google.com |grep 142.250.115.104 >/dev/null 2>&1
 if [ $? = 0 ]; then
     hasipv6="true"
 fi
@@ -68,7 +82,7 @@ DOMAINS2TEST="www.google.com amazon.com facebook.com www.youtube.com www.reddit.
 
 
 totaldomains=0
-printf "%-21s" ""
+printf "%-25s %-25s" "" ""
 for d in $DOMAINS2TEST; do
     totaldomains=$((totaldomains + 1))
     printf "%-8s" "test$totaldomains"
@@ -82,7 +96,7 @@ for p in $NAMESERVERS $providerstotest; do
     pname=${p##*#}
     ftime=0
 
-    printf "%-21s" "$pname"
+    printf "%-25s %-25s" "$pname" "$pip"
     for d in $DOMAINS2TEST; do
         ttime=`$dig +tries=1 +time=2 +stats @$pip $d |grep "Query time:" | cut -d : -f 2- | cut -d " " -f 2`
         if [ -z "$ttime" ]; then
@@ -97,7 +111,7 @@ for p in $NAMESERVERS $providerstotest; do
     done
     avg=`bc -l <<< "scale=2; $ftime/$totaldomains"`
 
-    echo "  $avg"
+    echo "$avg ms"
 done
 
 
